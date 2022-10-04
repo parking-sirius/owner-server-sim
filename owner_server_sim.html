@@ -7,7 +7,7 @@
     
     function wsConnect(url) {
         wsDisconnect();
-        ws = WebSocket(url);
+        ws = new WebSocket(url);
         ws.addEventListener('message', (event) => {
             let packet = JSON.parse(event.data);
             
