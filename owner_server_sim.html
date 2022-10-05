@@ -1,108 +1,14 @@
-<script>
-    var ws;
-    var parkingState = {};
-    for(let i=1;i<=16;i++) {
-        parkingState[i.toString()] = (Math.random()*5<1)?1:0;
-    }
-    
-    function wsConnect(url) {
-        wsDisconnect();
-        ws = new WebSocket(url);
-        ws.addEventListener('message', (event) => {
-            let packet = JSON.parse(event.data);
-            
-            switch(packet.action) {
-                case "full_sync":
-                    ws.send(JSON.stringify({
-                        "action": "full_sync",
-                        "status": "ok",
-                        "data": parkingState
-                    }));
-                    
-                    break;
-                    
-                case "part_sync":
-                    var resp = {};
-                    
-                    packet.data.forEach( (slot) => {
-                        resp[slot] = parkingState[slot];
-                    });
-                    
-                    ws.send(JSON.stringify({
-                        "action": "part_sync",
-                        "status": "ok",
-                        "data": resp
-                    }));
-                    
-                    break;
-                    
-                case "update_place_status":
-                    Object.entries(packet.data).forEach( (slot, state) => {
-                        parkingState[slot] = state;
-                    } );
-                    
-                    break;
-            }
-        });
-    }
-    
-    function wsDisconnect() {
-        if(ws) { 
-            ws.close();
-            ws = undefined;
-        }
-    }
-    
-    function drawSlotState(ctx, x, y, slot) {
-        var state = parkingState[slot];
-        if(!state) return;
-        
-        if(state==1) {
-            ctx.fillStyle = "#000";
-        } else {
-            ctx.fillStyle = "#ee00007f"
-        }
-        ctx.fillRect(x+4, y+8, 56-8, 96-16)
-    }
-    
-    function redrawCanvas() {
-        var ctx = document.getElementById("parking_canvas").getContext('2d');
-        ctx.translate(0.5, 0.5);
-        
-        ctx.textBaseline = "top";
-        ctx.font = "24px mono";
-        
-        for(let i=0;i<9;i++) {
-            let x = 16+i*56;
-            ctx.beginPath();
-            ctx.moveTo(x, 64);
-            ctx.lineTo(x, 128+128);
-            ctx.stroke();
-            
-            // Yes.
-            if(i!=8) {
-                ctx.fillStyle = "#999";
-                ctx.fillText((i+1).toString(), x+4, 68);
-                ctx.fillText((i+9).toString(), x+4, 164);
-                
-                drawSlotState(ctx, x, 64, (i+1).toString());
-                drawSlotState(ctx, x, 160, (i+9).toString());
-            }
-        }
-        ctx.beginPath();
-        ctx.moveTo(16, 160);
-        ctx.lineTo(464, 160);
-        ctx.stroke();
-    }
-    
-    window.onload = redrawCanvas;
-    
-</script>
-
+<!DOCTYPE html>
+<head>
+    <meta charset="utf-8" />
+    <title>Test parking</title>
+</head>
 <div>
     <input id="wsurlbox" type="text" placeholder="websocket url">
-    <button type="button" onclick="wsConnect(getElementById('wsurlbox').value);">Connect</button>
-    <button type="button" onclick="wsDisconnect();">Disconnect</button>
+    <button type="button" id="btnConnect">Connect</button>
+    <button type="button" id="btnDisconnect">Disconnect</button>
     <br>
     <canvas id="parking_canvas" width="480" height="360"></canvas>
+
+    <script src="js/app.js"></script>
 </div>
