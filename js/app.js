@@ -1,12 +1,15 @@
 const snakeToCamel = (str) => str.replace(/[^a-zA-Z0-9]+(.)/g, (m, chr) => chr.toUpperCase());
+const generateRandomId = () => Array(24).fill().map( () => Math.floor(Math.random()*36).toString(36) ).join('');
 
 class WebSocketProtocol
 {
     #ws = null;
     #state = null;
+    #stateUpdateCallback = null;
 
-    constructor(state) {
+    constructor(state, stateUpdateCallback) {
         this.#state = state;
+        this.#stateUpdateCallback = stateUpdateCallback;
     }
 
     open(url) {
@@ -26,12 +29,32 @@ class WebSocketProtocol
         this[snakeToCamel(packet.action)](packet);
     }
 
-    fullSync(packet) {
-        this.#ws.send(JSON.stringify({
-            'action': 'full_sync',
+    #sendRawPacket(packet) {
+        this.#ws.send(JSON.stringify(packet));
+    }
+
+    #sendPacket(action, data) {
+        let packet = {
+            'action': action,
+            'id': generateRandomId(),
             'status': 'ok',
-            'data': parkingState
-        }));
+            'data': data
+        };
+        this.#sendRawPacket(packet);
+    }
+
+    #respondToPacket(packet, data) {
+        let responsePacket = {
+            'action': packet.action,
+            'id': packet.id,
+            'status': 'ok',
+            'data': data
+        };
+        this.#sendRawPacket(responsePacket);
+    }
+
+    fullSync(packet) {
+        this.#respondToPacket(packet, this.#state);
     }
 
     partSync(packet) {
@@ -41,17 +64,14 @@ class WebSocketProtocol
             resp[slot] = this.#state[slot];
         });
         
-        this.#ws.send(JSON.stringify({
-            'action': 'part_sync',
-            'status': 'ok',
-            'data': resp
-        }));
+        this.#respondToPacket(packet, resp);
     }
 
     updatePlaceStatus(packet) {
         Object.entries(packet.data).forEach((slot, state) => {
             this.#state[slot] = state;
         });
+        this.#stateUpdateCallback?.();
     }
 }
 
@@ -103,8 +123,8 @@ class ParkingCanvas {
 
 class App {
     #parkingState = [...Array(16).keys()].map((_) => Math.round(Math.random()));
-    #ws = new WebSocketProtocol(this.#parkingState);
     #canvas = new ParkingCanvas(this.#parkingState);
+    #ws = new WebSocketProtocol(this.#parkingState, this.redraw);
 
     #btnConnect = document.getElementById('btnConnect');
     #btnDisconnect = document.getElementById('btnDisconnect');
