@@ -68,9 +68,10 @@ class WebSocketProtocol
     }
 
     updatePlaceStatus(packet) {
-        Object.entries(packet.data).forEach((slot, state) => {
+        Object.entries(packet.data).forEach( ([slot, state]) => {
             this.#state[slot] = state;
         });
+        
         this.#stateUpdateCallback?.();
     }
 }
@@ -91,18 +92,22 @@ class ParkingCanvas {
         this.#ctx.fillRect(x + 4, y + 8, 56 - 8, 96 - 16)
     }
 
+    drawLine(x1, y1, x2, y2) {
+        this.#ctx.beginPath();
+        this.#ctx.moveTo(x1-0.5, y1-0.5);
+        this.#ctx.lineTo(x2-0.5, y2-0.5);
+        this.#ctx.stroke();
+    }
+
     redrawCanvas() {
-        this.#ctx.translate(0.5, 0.5);
+        this.#ctx.clearRect(0, 0, 1000, 1000);
         
         this.#ctx.textBaseline = 'top';
         this.#ctx.font = '24px mono';
         
         for(let i = 0; i < 9; i++) {
             const x = 16 + i * 56;
-            this.#ctx.beginPath();
-            this.#ctx.moveTo(x, 64);
-            this.#ctx.lineTo(x, 128 + 128);
-            this.#ctx.stroke();
+            this.drawLine(x, 64, x, 256);
             
             // Yes.
             if(i != 8) {
@@ -114,24 +119,31 @@ class ParkingCanvas {
                 this.#drawSlotState(x, 160, (i + 9).toString());
             }
         }
-        this.#ctx.beginPath();
-        this.#ctx.moveTo(16, 160);
-        this.#ctx.lineTo(464, 160);
-        this.#ctx.stroke();
+        this.drawLine(16, 160, 464, 160);
     }
 }
 
 class App {
-    #parkingState = [...Array(16).keys()].map((_) => Math.round(Math.random()));
-    #canvas = new ParkingCanvas(this.#parkingState);
-    #ws = new WebSocketProtocol(this.#parkingState, this.redraw);
-
-    #btnConnect = document.getElementById('btnConnect');
-    #btnDisconnect = document.getElementById('btnDisconnect');
+    #parkingState;
+    #canvas;
+    #ws;
     
     constructor() {
-        this.#btnConnect.onclick = () => this.#ws.open(document.getElementById('wsurlbox').value);
-        this.#btnDisconnect.onclick = () => this.#ws.close();
+        this.redraw = this.redraw.bind(this);
+
+        this.#parkingState = {};
+        for(let i=1;i<=16;i++) {
+            this.#parkingState[i.toString()] = Math.floor(Math.random()*3)==0?1:0
+        }
+        
+        this.#canvas = new ParkingCanvas(this.#parkingState);
+        this.#ws = new WebSocketProtocol(this.#parkingState, this.redraw);
+        
+        var btnConnect = document.getElementById('btnConnect');
+        var btnDisconnect = document.getElementById('btnDisconnect');
+
+        btnConnect.onclick = () => this.#ws.open(document.getElementById('wsurlbox').value);
+        btnDisconnect.onclick = () => this.#ws.close();
     }
 
     redraw() {
