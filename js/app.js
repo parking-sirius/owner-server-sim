@@ -170,11 +170,16 @@ class App {
         
         this.#ws = new WebSocketProtocol(this.#parkingState, this.redraw);
         
-        var btnConnect = document.getElementById('btnConnect');
-        var btnDisconnect = document.getElementById('btnDisconnect');
+        const wsConnect = () => this.#ws.open(document.getElementById('textWebsocketUrl').value);
+        const wsDisconnect = () => this.#ws.close();
 
-        btnConnect.onclick = () => this.#ws.open(document.getElementById('wsurlbox').value);
-        btnDisconnect.onclick = () => this.#ws.close();
+        var btnConnect = document.getElementById('btnConnect');
+        btnConnect.onclick = wsConnect;
+        
+        var btnDisconnect = document.getElementById('btnDisconnect');
+        btnDisconnect.onclick = wsDisconnect;
+        
+        if(document.getElementById('checkboxAutoconnect').checked) wsConnect();
     }
 
     redraw() {
