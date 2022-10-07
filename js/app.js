@@ -30,10 +30,10 @@ class WebSocketProtocol
     }
 
     #sendRawPacket(packet) {
-        this.#ws.send(JSON.stringify(packet));
+        this.#ws?.send(JSON.stringify(packet));
     }
 
-    #sendPacket(action, data) {
+    sendPacket(action, data) {
         let packet = {
             'action': action,
             'id': generateRandomId(),
@@ -77,11 +77,26 @@ class WebSocketProtocol
 }
 
 class ParkingCanvas {
-    #ctx = document.getElementById('parking_canvas').getContext('2d');
-    #state = null;
+    #ctx;
+    #state;
+    #carClickCallback;
 
-    constructor(state) {
+    constructor(element, state, carClickCallback) {
+        this.#ctx = element.getContext('2d');
         this.#state = state;
+        this.#carClickCallback = carClickCallback;
+        
+        let left = element.offsetLeft + element.clientLeft;
+        let top = element.offsetTop + element.clientTop;
+        
+        // https://i.imgur.com/z3StPTj.jpeg
+        const thisObj = this;
+        
+        element.addEventListener('click', function(event) {
+            event.car = thisObj.#calcParkingSlot(event.pageX - left, event.pageY - top);
+            
+            carClickCallback(event);
+        });
     }
 
     #drawSlotState(x, y, slot) {
@@ -90,6 +105,14 @@ class ParkingCanvas {
 
         this.#ctx.fillStyle = state == 1 ? '#000000' : '#ee00007f';
         this.#ctx.fillRect(x + 4, y + 8, 56 - 8, 96 - 16)
+    }
+
+    #calcParkingSlot(x, y) {
+        var carX = Math.floor((x - 16)/56);
+        var carY = Math.floor((y - 64)/96);
+        
+        if( carX>=0 && carX<=7 && carY>=0 && carY <= 1 ) 
+            return 1+(carX + 8*carY);        
     }
 
     drawLine(x1, y1, x2, y2) {
@@ -136,7 +159,15 @@ class App {
             this.#parkingState[i.toString()] = Math.floor(Math.random()*3)==0?1:0
         }
         
-        this.#canvas = new ParkingCanvas(this.#parkingState);
+        const thisObj = this;
+        this.#canvas = new ParkingCanvas(document.getElementById('parking_canvas'), this.#parkingState, (event) => {
+            let car = event.car;
+            thisObj.#parkingState[car] = (thisObj.#parkingState[car]+1) % 3;
+            thisObj.redraw();
+            
+            thisObj.#ws.sendPacket('part_sync', {[car]: thisObj.#parkingState[car]});
+        });
+        
         this.#ws = new WebSocketProtocol(this.#parkingState, this.redraw);
         
         var btnConnect = document.getElementById('btnConnect');
